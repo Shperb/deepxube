@@ -1,10 +1,14 @@
-from typing import List, Optional, Tuple
+import json
+import os
+from typing import Dict, List, Optional, Tuple
 
 from deepxube.base.domain import ActsEnum, GoalSampleableFromState, StringToAct
+from deepxube.base.factory import DelimParser
 from deepxube.domains.lean.types import LeanState, LeanAction, LeanGoal
 from deepxube.domains.lean.backend import LeanBackend
 from deepxube.domains.lean.policy import TacticGenerator, CachedTacticGenerator
 from deepxube.domains.lean.corpus import Corpus
+from deepxube.factories.domain_factory import domain_factory
 from deepxube.utils.timing_utils import Times
 
 
@@ -92,3 +96,51 @@ class LeanDomain(ActsEnum[LeanState, LeanAction, LeanGoal],
             states.append(LeanState(theorem_id=tid, tactic_path=(), pp=self.backend.initial_pp(tid), done=False))
         goals: List[LeanGoal] = [LeanGoal(None) for _ in states]
         return states, goals
+
+
+@domain_factory.register_class("lean")
+class LeanDomainCLI(LeanDomain):
+    """ CLI-constructible LeanDomain: builds the real LeanDojo backend + ReProver generator + corpus from a JSON manifest.
+
+    Manifest schema: {"theorems": [{"url","commit","file_path","theorem_name","proof_len"?}, ...]}
+    Heavy deps (lean_dojo, transformers) are imported lazily inside __init__ / only loaded when actually used.
+    """
+    def __init__(self, k: int = 8, manifest: str = "lean_corpus.json",
+                 model_name: str = "kaiyuy/leandojo-lean4-tacgen-byt5-small",
+                 seed: int = 0, max_sessions: int = 8):
+        from deepxube.domains.lean.dojo_backend import LeanDojoBackend, TheoremRef
+        from deepxube.domains.lean.policy import ReProverGenerator
+        from deepxube.domains.lean.corpus import Corpus, CorpusEntry
+
+        assert os.path.exists(manifest), f"corpus manifest not found: {manifest}"
+        with open(manifest, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        entries: List[CorpusEntry] = []
+        refs: Dict[str, TheoremRef] = {}
+        for item in data["theorems"]:
+            ref = TheoremRef(item["url"], item["commit"], item["file_path"], item["theorem_name"])
+            refs[ref.theorem_id] = ref
+            entries.append(CorpusEntry(ref, proof_len=item.get("proof_len")))
+        backend = LeanDojoBackend(refs, max_sessions=max_sessions)
+        generator = ReProverGenerator(model_name=model_name)
+        super().__init__(backend=backend, generator=generator, corpus=Corpus(entries),
+                         k=k, model_name=model_name, seed=seed)
+
+
+def build_lean_domain(k: int = 8, manifest: str = "lean_corpus.json",
+                      model_name: str = "kaiyuy/leandojo-lean4-tacgen-byt5-small",
+                      seed: int = 0, max_sessions: int = 8) -> "LeanDomainCLI":
+    """ Convenience factory returning a CLI-constructed LeanDomain from a JSON manifest. """
+    return LeanDomainCLI(k=k, manifest=manifest, model_name=model_name, seed=seed, max_sessions=max_sessions)
+
+
+@domain_factory.register_parser("lean")
+class LeanParser(DelimParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.add_argument("k", "k", int, "number of top tactics per state")
+        self.add_argument("seed", "seed", int, "random seed")
+
+    @property
+    def delim(self) -> str:
+        return "_"
