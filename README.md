@@ -96,6 +96,9 @@ By convention, everything after '.' are considered arguments.
 
 Running `deepxube domain_info` in a directory with `domains/grid.py` should produce information about grid (amongst other available domains):
 
+#### Lean theorem proving
+An optional domain for Lean 4 theorem proving lives in `deepxube/domains/lean/` (install extras with `pip install deepxube[lean]`). States are Lean tactic states, the action set at each state is the top-*k* tactics from a pretrained ReProver policy, and a goal-conditioned heuristic is learned with the existing HER value-learning updater. It requires a Linux environment (WSL on Windows); see `docs_gen/lean_setup.md` for setup, tracing, and the train/solve commands.
+
 ### Domain Visualization
 Visualization of states/goals and the domain transition function can be useful to validating it.
 To accomplish this, a domain can inherit from `StateGoalVizable` to convert state/goal pairs to figures
