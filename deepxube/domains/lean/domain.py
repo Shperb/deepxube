@@ -48,10 +48,18 @@ class LeanDomain(ActsEnum[LeanState, LeanAction, LeanGoal],
     def __repr__(self) -> str:
         return f"LeanDomain(k={self.k}, model={self.model_name})"
 
-    # --- Not yet implemented; filled in by later tasks ---
     def get_state_actions(self, states: List[LeanState]) -> List[List[LeanAction]]:
-        raise NotImplementedError("implemented in Task 9")
+        # terminal/dead states expand to nothing
+        need_idx: List[int] = [i for i, s in enumerate(states) if not (s.done or s.is_dead())]
+        pps: List[str] = [states[i].pp for i in need_idx]
+        gen_out: List[List[str]] = self.generator.top_k(pps, self.k) if pps else []
 
+        actions_l: List[List[LeanAction]] = [[] for _ in states]
+        for local_i, state_i in enumerate(need_idx):
+            actions_l[state_i] = [LeanAction(t) for t in gen_out[local_i]]
+        return actions_l
+
+    # --- Not yet implemented; filled in by later tasks ---
     def next_state(self, states: List[LeanState], actions: List[LeanAction]) -> Tuple[List[LeanState], List[float]]:
         raise NotImplementedError("implemented in Task 10")
 
