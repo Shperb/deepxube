@@ -314,6 +314,8 @@ class HeurNNetParV(HeurNNetPar[HeurFnV]):
         nnet.eval()
 
         def heuristic_fn(states: List[State], goals: List[Goal]) -> List[float]:
+            if len(states) == 0:
+                return []
             inputs_nnet: List[NDArray] = self.to_np(states, goals)
             heurs: NDArray[np.float64] = nnet_batched(nnet, inputs_nnet, batch_size, device)[0]
 
@@ -322,6 +324,8 @@ class HeurNNetParV(HeurNNetPar[HeurFnV]):
 
     def get_nnet_par_fn(self, nnet_par_info: NNetParInfo, update_num: Optional[int]) -> HeurFnV:
         def heuristic_fn(states: List[State], goals: List[Goal]) -> List[float]:
+            if len(states) == 0:
+                return []
             inputs_nnet: List[NDArray] = self.to_np(states, goals)
             heurs: NDArray[np.float64] = get_nnet_par_out(inputs_nnet, nnet_par_info)[0]
 
@@ -369,6 +373,8 @@ class HeurNNetParQFixOut(HeurNNetParQ, ABC):
         nnet.eval()
 
         def heuristic_fn(states: List[State], goals: List[Goal], actions_l: List[List[Action]]) -> List[List[float]]:
+            if len(states) == 0:
+                return []
             inputs_nnet: List[NDArray] = self._get_input(states, goals, actions_l)
             q_vals_np: NDArray[np.float64] = nnet_batched(nnet, inputs_nnet, batch_size, device)[0]
             return self._get_output(states, q_vals_np, update_num)
@@ -377,6 +383,8 @@ class HeurNNetParQFixOut(HeurNNetParQ, ABC):
 
     def get_nnet_par_fn(self, nnet_par_info: NNetParInfo, update_num: Optional[int]) -> HeurFnQ:
         def heuristic_fn(states: List[State], goals: List[Goal], actions_l: List[List[Action]]) -> List[List[float]]:
+            if len(states) == 0:
+                return []
             inputs_nnet: List[NDArray] = self._get_input(states, goals, actions_l)
             q_vals_np: NDArray[np.float64] = get_nnet_par_out(inputs_nnet, nnet_par_info)[0]
             return self._get_output(states, q_vals_np, update_num)
@@ -419,6 +427,8 @@ class HeurNNetParQIn(HeurNNetParQ, ABC):
         nnet.eval()
 
         def heuristic_fn(states: List[State], goals: List[Goal], actions_l: List[List[Action]]) -> List[List[float]]:
+            if len(states) == 0:
+                return []
             inputs_nnet, states_rep, split_idxs = self._get_input(states, goals, actions_l)
             q_vals_np: NDArray = nnet_batched(nnet, inputs_nnet, batch_size, device)[0]
             return self._get_output(states_rep, q_vals_np, split_idxs, update_num)
@@ -427,6 +437,8 @@ class HeurNNetParQIn(HeurNNetParQ, ABC):
 
     def get_nnet_par_fn(self, nnet_par_info: NNetParInfo, update_num: Optional[int]) -> HeurFnQ:
         def heuristic_fn(states: List[State], goals: List[Goal], actions_l: List[List[Action]]) -> List[List[float]]:
+            if len(states) == 0:
+                return []
             inputs_nnet, states_rep, split_idxs = self._get_input(states, goals, actions_l)
             q_vals_np: NDArray = get_nnet_par_out(inputs_nnet, nnet_par_info)[0]
             return self._get_output(states_rep, q_vals_np, split_idxs, update_num)
@@ -470,6 +482,8 @@ class PolicyNNetPar(NNetPar[PolicyFn]):
         nnet.eval()
 
         def policy_fn(states: List[State], goals: List[Goal]) -> Tuple[List[List[Action]], List[List[float]]]:
+            if len(states) == 0:
+                return [], []
             inputs_nnet: List[NDArray] = self.to_np_fn(states, goals)
             nnet_out_np: List[NDArray[np.float64]] = nnet_batched(nnet, inputs_nnet, batch_size, device)
 
@@ -479,6 +493,8 @@ class PolicyNNetPar(NNetPar[PolicyFn]):
 
     def get_nnet_par_fn(self, nnet_par_info: NNetParInfo, update_num: Optional[int]) -> PolicyFn:
         def policy_fn(states: List[State], goals: List[Goal]) -> Tuple[List[List[Action]], List[List[float]]]:
+            if len(states) == 0:
+                return [], []
             inputs_nnet: List[NDArray] = self.to_np_fn(states, goals)
             nnet_out_np: List[NDArray[np.float64]] = get_nnet_par_out(inputs_nnet, nnet_par_info)
 
