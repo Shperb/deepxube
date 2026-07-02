@@ -62,7 +62,13 @@ class UpdateHeurVRL(UpdateHeurV[D, FNsHV, PathFindSetHeurV], UpdateRL[D, FNsHV, 
         ctg_next_p_tc = np.concatenate(tcs_l, axis=0) + np.array(ctg_next)
         ctg_next_p_tc_l = np.split(ctg_next_p_tc, split_idxs)
 
-        ctgs_backup = np.array([np.min(x) for x in ctg_next_p_tc_l]) * np.logical_not(is_solved_l)
+        # min over each state's children. A childless state has no lookahead: if it is solved its
+        # backup is 0 (masked below); otherwise it is a dead-end with no path to the goal (inf).
+        # np.where (rather than multiply) is identical to `min * not_solved` for states with children,
+        # and avoids inf*0 = nan for solved childless states (which occur in domains where solved
+        # states have no applicable actions, e.g. a completed Lean proof).
+        mins: NDArray = np.array([np.min(x) if x.size > 0 else np.inf for x in ctg_next_p_tc_l])
+        ctgs_backup = np.where(np.array(is_solved_l, dtype=bool), 0.0, mins)
         ctgs_backup_l: List[float] = cast(List[float], ctgs_backup.tolist())
 
         return ctgs_backup_l
