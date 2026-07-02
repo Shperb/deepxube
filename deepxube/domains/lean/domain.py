@@ -79,7 +79,16 @@ class LeanDomain(ActsEnum[LeanState, LeanAction, LeanGoal],
                 ))
         return states_next, [1.0] * len(states_next)
 
-    # --- Not yet implemented; filled in by later tasks ---
     def sample_problem_instances(self, num_steps_l: List[int],
                                  times: Optional[Times] = None) -> Tuple[List[LeanState], List[LeanGoal]]:
-        raise NotImplementedError("implemented in Task 11")
+        # deterministic curriculum sampling; advance the seed per call for variety across iterations
+        call_seed: int = hash((self.seed, self._sample_calls)) & 0x7FFFFFFF
+        self._sample_calls += 1
+        entries = self.corpus.sample_theorems(num_steps_l, seed=call_seed)
+
+        states: List[LeanState] = []
+        for entry in entries:
+            tid = entry.ref.theorem_id
+            states.append(LeanState(theorem_id=tid, tactic_path=(), pp=self.backend.initial_pp(tid), done=False))
+        goals: List[LeanGoal] = [LeanGoal(None) for _ in states]
+        return states, goals
