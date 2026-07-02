@@ -59,10 +59,27 @@ class LeanDomain(ActsEnum[LeanState, LeanAction, LeanGoal],
             actions_l[state_i] = [LeanAction(t) for t in gen_out[local_i]]
         return actions_l
 
-    # --- Not yet implemented; filled in by later tasks ---
-    def next_state(self, states: List[LeanState], actions: List[LeanAction]) -> Tuple[List[LeanState], List[float]]:
-        raise NotImplementedError("implemented in Task 10")
+    def next_state(self, states: List[LeanState],
+                   actions: List[LeanAction]) -> Tuple[List[LeanState], List[float]]:
+        states_next: List[LeanState] = []
+        for state, action in zip(states, actions, strict=True):
+            if state.done or state.is_dead():
+                # terminal/dead states should not be expanded; guard defensively
+                states_next.append(LeanState.dead())
+                continue
+            outcome = self.backend.run(state.theorem_id, state.tactic_path, action.tactic)
+            if outcome.error is not None or outcome.pp is None:
+                states_next.append(LeanState.dead())
+            else:
+                states_next.append(LeanState(
+                    theorem_id=state.theorem_id,
+                    tactic_path=state.tactic_path + (action.tactic,),
+                    pp=outcome.pp,
+                    done=outcome.done,
+                ))
+        return states_next, [1.0] * len(states_next)
 
+    # --- Not yet implemented; filled in by later tasks ---
     def sample_problem_instances(self, num_steps_l: List[int],
                                  times: Optional[Times] = None) -> Tuple[List[LeanState], List[LeanGoal]]:
         raise NotImplementedError("implemented in Task 11")
