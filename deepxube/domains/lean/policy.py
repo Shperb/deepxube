@@ -43,18 +43,26 @@ class ReProverGenerator:
     """ ReProver ByT5 tactic generator (deterministic beam search). Lazily loads transformers/torch. """
 
     def __init__(self, model_name: str = "kaiyuy/leandojo-lean4-tacgen-byt5-small",
-                 device: str = "cpu", max_length: int = 1024):
+                 device: str = "auto", max_length: int = 1024):
         self._model_name = model_name
-        self._device = device
+        self._device = device  # "auto" -> cuda if available else cpu; resolved lazily on load
         self._max_length = max_length
         self._tokenizer: Optional[Any] = None
         self._model: Optional[Any] = None
+
+    @staticmethod
+    def _resolve_device(device: str) -> str:
+        if device == "auto":
+            import torch
+            return "cuda" if torch.cuda.is_available() else "cpu"
+        return device
 
     def _ensure_loaded(self) -> None:
         if self._model is not None:
             return
         from deepxube.domains.lean._optional import require
         tf = require("transformers", extra="lean")
+        self._device = self._resolve_device(self._device)
         self._tokenizer = tf.AutoTokenizer.from_pretrained(self._model_name)
         self._model = tf.AutoModelForSeq2SeqLM.from_pretrained(self._model_name).to(self._device)
         self._model.eval()

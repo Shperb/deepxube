@@ -12,6 +12,14 @@ def test_reprover_generates_k_tactics():
     assert len(out) == 1 and 1 <= len(out[0]) <= 4 and all(isinstance(t, str) for t in out[0])
 
 
+def test_reprover_resolve_device():
+    import torch
+    from deepxube.domains.lean.policy import ReProverGenerator
+    assert ReProverGenerator._resolve_device("cpu") == "cpu"
+    assert ReProverGenerator._resolve_device("cuda") == "cuda"
+    assert ReProverGenerator._resolve_device("auto") == ("cuda" if torch.cuda.is_available() else "cpu")
+
+
 def test_reprover_construction_is_lazy():
     # Constructing must not import transformers/torch or download the model.
     from deepxube.domains.lean.policy import ReProverGenerator
