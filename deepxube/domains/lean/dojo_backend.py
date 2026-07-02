@@ -101,7 +101,7 @@ class LeanDojoBackend:
 
     def initial_pp(self, theorem_id: str) -> str:
         sess = self._session(theorem_id)
-        return sess.states[()].pp
+        return str(sess.states[()].pp)
 
     def run(self, theorem_id: str, tactic_path: Tuple[str, ...], tactic: str) -> TacticOutcome:
         ld = require("lean_dojo", extra="lean")
