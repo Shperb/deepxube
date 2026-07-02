@@ -26,14 +26,17 @@ class CachedTacticGenerator:
         self._cache: Dict[str, List[str]] = {}
 
     def top_k(self, states: List[str], k: int) -> List[List[str]]:
-        missing: List[str] = [s for s in states if s not in self._cache]
-        if missing:
-            # de-duplicate while preserving order
-            uniq = list(dict.fromkeys(missing))
+        # (Re)query states that are uncached or whose cached list has fewer than k entries
+        # (so resampling with a larger k grows the candidate set). If the inner generator is
+        # exhausted (returns fewer than k), the shorter list is cached and returned as-is.
+        need: List[str] = [s for s in states if len(self._cache.get(s, [])) < k]
+        if need:
+            uniq = list(dict.fromkeys(need))  # de-duplicate while preserving order
             results = self._inner.top_k(uniq, k)
             for s, tactics in zip(uniq, results, strict=True):
-                self._cache[s] = tactics
-        return [self._cache[s] for s in states]
+                if len(tactics) >= len(self._cache.get(s, [])):
+                    self._cache[s] = tactics
+        return [self._cache[s][:k] for s in states]
 
 
 class ReProverGenerator:

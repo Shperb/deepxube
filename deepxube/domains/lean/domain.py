@@ -18,7 +18,7 @@ class LeanDomain(ActsEnum[LeanState, LeanAction, LeanGoal],
     """ Lean 4 theorem-proving domain. Actions are top-k ReProver tactics; goal-conditioned via HER. """
 
     def __init__(self, backend: LeanBackend, generator: TacticGenerator, corpus: Corpus,
-                 k: int, model_name: str, seed: int):
+                 k: int, model_name: str, seed: int, resample_attempts: int = 2):
         super().__init__()
         self.backend: LeanBackend = backend
         self.generator: CachedTacticGenerator = CachedTacticGenerator(generator)
@@ -26,6 +26,9 @@ class LeanDomain(ActsEnum[LeanState, LeanAction, LeanGoal],
         self.k: int = k
         self.model_name: str = model_name
         self.seed: int = seed
+        # If fewer than k candidate tactics validate, grow the beam deterministically and retry
+        # up to this many times (candidates cannot hurt: they only enlarge the successor set).
+        self.resample_attempts: int = resample_attempts
         self._sample_calls: int = 0
 
     def is_solved(self, states: List[LeanState], goals: List[LeanGoal]) -> List[bool]:
@@ -52,15 +55,40 @@ class LeanDomain(ActsEnum[LeanState, LeanAction, LeanGoal],
     def __repr__(self) -> str:
         return f"LeanDomain(k={self.k}, model={self.model_name})"
 
+    def _valid_tactics(self, state: LeanState, candidates: List[str]) -> List[str]:
+        """ Keep only candidates that Lean accepts (validated via the backend; results are cached
+        so next_state reuses them). Preserves candidate order. """
+        valid: List[str] = []
+        for tactic in candidates:
+            outcome = self.backend.run(state.theorem_id, state.tactic_path, tactic)
+            if outcome.error is None and outcome.pp is not None:
+                valid.append(tactic)
+        return valid
+
     def get_state_actions(self, states: List[LeanState]) -> List[List[LeanAction]]:
         # terminal/dead states expand to nothing
         need_idx: List[int] = [i for i, s in enumerate(states) if not (s.done or s.is_dead())]
-        pps: List[str] = [states[i].pp for i in need_idx]
-        gen_out: List[List[str]] = self.generator.top_k(pps, self.k) if pps else []
-
         actions_l: List[List[LeanAction]] = [[] for _ in states]
+        if not need_idx:
+            return actions_l
+
+        # batched initial generation, then per-state validation (+ deterministic resampling)
+        cand_l: List[List[str]] = self.generator.top_k([states[i].pp for i in need_idx], self.k)
         for local_i, state_i in enumerate(need_idx):
-            actions_l[state_i] = [LeanAction(t) for t in gen_out[local_i]]
+            state = states[state_i]
+            candidates: List[str] = cand_l[local_i]
+            valid: List[str] = self._valid_tactics(state, candidates)
+
+            k_try: int = self.k
+            attempts: int = 0
+            # grow the beam only while the generator is not exhausted and we still lack k valid ones
+            while len(valid) < self.k and len(candidates) >= k_try and attempts < self.resample_attempts:
+                k_try *= 2
+                candidates = self.generator.top_k([state.pp], k_try)[0]
+                valid = self._valid_tactics(state, candidates)
+                attempts += 1
+
+            actions_l[state_i] = [LeanAction(t) for t in valid[:self.k]]
         return actions_l
 
     def next_state(self, states: List[LeanState],

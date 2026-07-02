@@ -105,6 +105,14 @@ class UpdateHeurVRL(UpdateHeurV[D, FNsHV, PathFindSetHeurV], UpdateRL[D, FNsHV, 
         ctgs_backup: List[float] = self._value_iteration_target(goals, is_solved_l, tcs_l, states_exp)
         times.record_time("vi_targ", time.time() - start_time, path=["replay"])
 
+        # Drop states with no valid backup (childless, non-solved dead-ends -> inf target). These
+        # would otherwise poison the MSE loss. They are rare when the domain prunes invalid actions.
+        keep: List[int] = [i for i, c in enumerate(ctgs_backup) if np.isfinite(c)]
+        if len(keep) < len(ctgs_backup):
+            states = [states[i] for i in keep]
+            goals = [goals[i] for i in keep]
+            ctgs_backup = [ctgs_backup[i] for i in keep]
+
         return states, goals, ctgs_backup
 
 

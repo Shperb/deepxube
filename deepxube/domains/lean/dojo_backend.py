@@ -43,6 +43,9 @@ class LeanDojoBackend:
         self._refs = refs
         self._max_sessions = max_sessions
         self._sessions: "OrderedDict[str, _Session]" = OrderedDict()
+        # idempotency cache so validating a tactic (get_state_actions) and realizing it
+        # (next_state) costs a single run_tac. Process-local; rebuilt after pickling.
+        self._outcome_cache: Dict[Tuple[str, Tuple[str, ...], str], TacticOutcome] = {}
 
     def __getstate__(self) -> Dict[str, Any]:
         return {"_refs": self._refs, "_max_sessions": self._max_sessions}
@@ -51,6 +54,7 @@ class LeanDojoBackend:
         self._refs = state["_refs"]
         self._max_sessions = state["_max_sessions"]
         self._sessions = OrderedDict()
+        self._outcome_cache = {}
 
     @staticmethod
     def _is_lean_error(ld: Any, result: Any) -> bool:
@@ -104,14 +108,22 @@ class LeanDojoBackend:
         return str(sess.states[()].pp)
 
     def run(self, theorem_id: str, tactic_path: Tuple[str, ...], tactic: str) -> TacticOutcome:
+        key: Tuple[str, Tuple[str, ...], str] = (theorem_id, tuple(tactic_path), tactic)
+        cached = self._outcome_cache.get(key)
+        if cached is not None:
+            return cached
+
         ld = require("lean_dojo", extra="lean")
         sess = self._session(theorem_id)
         cur = self._state_at(sess, tuple(tactic_path))
         result = sess.dojo.run_tac(cur, tactic)
         if isinstance(result, ld.ProofFinished):
-            return TacticOutcome(pp="no goals", done=True, error=None)
-        if self._is_lean_error(ld, result):
-            return TacticOutcome(pp=None, done=False, error=str(getattr(result, "error", result)))
-        new_path = tuple(tactic_path) + (tactic,)
-        sess.states[new_path] = result
-        return TacticOutcome(pp=result.pp, done=False, error=None)
+            outcome = TacticOutcome(pp="no goals", done=True, error=None)
+        elif self._is_lean_error(ld, result):
+            outcome = TacticOutcome(pp=None, done=False, error=str(getattr(result, "error", result)))
+        else:
+            sess.states[tuple(tactic_path) + (tactic,)] = result
+            outcome = TacticOutcome(pp=result.pp, done=False, error=None)
+
+        self._outcome_cache[key] = outcome
+        return outcome
