@@ -34,3 +34,46 @@ class CachedTacticGenerator:
             for s, tactics in zip(uniq, results, strict=True):
                 self._cache[s] = tactics
         return [self._cache[s] for s in states]
+
+
+class ReProverGenerator:
+    """ ReProver ByT5 tactic generator (deterministic beam search). Lazily loads transformers/torch. """
+
+    def __init__(self, model_name: str = "kaiyuy/leandojo-lean4-tacgen-byt5-small",
+                 device: str = "cpu", max_length: int = 1024):
+        self._model_name = model_name
+        self._device = device
+        self._max_length = max_length
+        self._tokenizer = None
+        self._model = None
+
+    def _ensure_loaded(self) -> None:
+        if self._model is not None:
+            return
+        from deepxube.domains.lean._optional import require
+        tf = require("transformers", extra="lean")
+        self._tokenizer = tf.AutoTokenizer.from_pretrained(self._model_name)
+        self._model = tf.AutoModelForSeq2SeqLM.from_pretrained(self._model_name).to(self._device)
+        self._model.eval()
+
+    def top_k(self, states: List[str], k: int) -> List[List[str]]:
+        import torch
+        self._ensure_loaded()
+        assert self._tokenizer is not None and self._model is not None
+        out: List[List[str]] = []
+        for state in states:
+            enc = self._tokenizer(state, return_tensors="pt", truncation=True,
+                                  max_length=self._max_length).to(self._device)
+            with torch.no_grad():
+                gen_ids = self._model.generate(
+                    enc.input_ids,
+                    max_length=self._max_length,
+                    num_beams=k,
+                    num_return_sequences=k,
+                    do_sample=False,
+                    length_penalty=0.0,
+                    early_stopping=False,
+                )
+            tactics = self._tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
+            out.append(list(dict.fromkeys(t.strip() for t in tactics if t.strip())))
+        return out
