@@ -1,4 +1,4 @@
-from typing import Dict, List, Protocol, runtime_checkable
+from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -44,8 +44,8 @@ class ReProverGenerator:
         self._model_name = model_name
         self._device = device
         self._max_length = max_length
-        self._tokenizer = None
-        self._model = None
+        self._tokenizer: Optional[Any] = None
+        self._model: Optional[Any] = None
 
     def _ensure_loaded(self) -> None:
         if self._model is not None:
