@@ -9,8 +9,8 @@ from deepxube.utils.timing_utils import Times
 
 
 class LeanDomain(ActsEnum[LeanState, LeanAction, LeanGoal],
-                  GoalSampleableFromState[LeanState, LeanAction, LeanGoal],
-                  StringToAct[LeanState, LeanAction, LeanGoal]):
+                 GoalSampleableFromState[LeanState, LeanAction, LeanGoal],
+                 StringToAct[LeanState, LeanAction, LeanGoal]):
     """ Lean 4 theorem-proving domain. Actions are top-k ReProver tactics; goal-conditioned via HER. """
 
     def __init__(self, backend: LeanBackend, generator: TacticGenerator, corpus: Corpus,
@@ -34,7 +34,7 @@ class LeanDomain(ActsEnum[LeanState, LeanAction, LeanGoal],
         return out
 
     def sample_goal_from_state(self, states_start: Optional[List[LeanState]],
-                                states_goal: List[LeanState]) -> List[LeanGoal]:
+                               states_goal: List[LeanState]) -> List[LeanGoal]:
         # HER relabeling: the goal is exactly the reached tactic state
         return [LeanGoal(target_pp=s.pp) for s in states_goal]
 
@@ -56,5 +56,5 @@ class LeanDomain(ActsEnum[LeanState, LeanAction, LeanGoal],
         raise NotImplementedError("implemented in Task 10")
 
     def sample_problem_instances(self, num_steps_l: List[int],
-                                  times: Optional[Times] = None) -> Tuple[List[LeanState], List[LeanGoal]]:
+                                 times: Optional[Times] = None) -> Tuple[List[LeanState], List[LeanGoal]]:
         raise NotImplementedError("implemented in Task 11")
