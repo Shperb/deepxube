@@ -2,6 +2,7 @@ import os
 import pytest
 
 
+@pytest.mark.lean
 @pytest.mark.skipif(os.environ.get("DEEPXUBE_LEAN_TESTS") != "1",
                     reason="downloads the ReProver model; set DEEPXUBE_LEAN_TESTS=1")
 def test_reprover_generates_k_tactics():
