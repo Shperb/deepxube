@@ -5,7 +5,10 @@ from deepxube.factories.domain_factory import domain_factory
 from deepxube.base.domain import Domain, State, Goal, GoalSampleableFromState, GoalSampleable, ActsRev, ActsEnum
 
 
-DOMAIN_NAMES: List[str] = [cls_name for cls_name in domain_factory.get_all_class_names() if cls_name != "sokoban"]
+# "lean" is excluded because it requires external infrastructure (LeanDojo, a traced repo, a corpus
+# manifest, and the ReProver model) that the generic domain contract test cannot provide; it has its
+# own test suite under deepxube/tests/lean/.
+DOMAIN_NAMES: List[str] = [cls_name for cls_name in domain_factory.get_all_class_names() if cls_name not in ("sokoban", "lean")]
 
 
 def build_domain_from_name(domain_id: str) -> Domain:
